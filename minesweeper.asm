@@ -1,24 +1,39 @@
-.data
-game	DB 25 DUP(0)
+.data  
+bombs	DB 25 DUP(0)
+qty_bombs DB ?
 
 .code
 
 #make_BIN#
+               
+MOV qty_bombs, 15
+               
+CALL start_bombs
+;JMP show_table
 
-JMP show_table
-
-start_matrix:
-	MOV dh, 0
-	sm_l1:
-	MOV dl, 0
-		sm_l2:
-		MOV [game], dl
-		INC dl
-		CMP dl, 5
-		JL sm_l2
-	INC dh
-	CMP dh, 5
-	JL sm_l1
+start_bombs PROC
+    MOV CX, 15
+    
+    PUSH CX
+	MOV AH, 2CH
+    INT 21H
+    POP CX 
+    
+    MOV AL, DL    	
+	; Eq congruente (ant*2+1) mod 25
+	loop_bombs:
+    	MOV BX, 2
+    	MUL BX
+    	ADD AX, 1
+    	MOV BX, 25
+    	MOV AH, 0
+    	DIV BX
+    	MOV AL, DL
+    	CBW
+    	MOV SI, AX
+    	MOV [bombs + SI], 1
+    LOOP loop_bombs
+start_bombs ENDP
 
 
 show_table:
