@@ -9,7 +9,8 @@ ORG 100h
 
     bombs    DB 25 DUP(0)
     qty_bombs DW ?
-    selected_pos DB ?
+    last_pos DB 0
+    current_pos DB 0
 
 .code
 
@@ -50,7 +51,6 @@ ask_level_events PROC
 
             ;unmark easy option
             MOV AL, ' '
-            MOV BH, 0
             MOV CX, 1
             MOV Ah, 0Ah
             INT 10h
@@ -60,7 +60,6 @@ ask_level_events PROC
             ;set cursor position at hard option
             MOV DH, 3
             MOV DL, 6
-            MOV BH, 0
             MOV AH, 2h
             INT 10h
             POPA
@@ -89,7 +88,6 @@ ask_level_events PROC
                 INT 10h
 
                 MOV AL, 'X'
-                MOV BH, 0
                 MOV CX, 1
                 MOV Ah, 0Ah
                 INT 10h
@@ -133,11 +131,10 @@ start_bombs PROC
         MOV SI, AX
         MOV [bombs + SI], 1
     LOOP loop_bombs
+    RET
 start_bombs ENDP
 
 show_table PROC
-    CALL clear_screen
-
     MOV DH, 0
     MOV CL, 0
     l1:
@@ -146,33 +143,27 @@ show_table PROC
     mov AH, 02h  ;SetCursorPosition
     INT 10h
         l2:
-        CMP selected_pos, CL
-        JE selected_char
-        JNE normal_char
-        selected_char:
-            MOV  AL, 'X'
-            JMP char_end
-        normal_char:
-            MOV  AL, 'x'
-            JMP char_end
-        char_end:
+        
+        MOV  AL, 'x'
         ;mov  bl, 0Ch  ;Color is red
         ;mov  bh, 0    ;Display page
         MOV  AH, 0Eh  ;Teletype
         INT  10h
 
-        INC dl
+        INC DL
         INC CL
-        CMP dl, 5
+        CMP DL, 5
         JL l2
-    INC dh
-    CMP dh, 5
+    INC DH
+    CMP DH, 5
     JL l1
 
     RET
 show_table ENDP
 
 update_main_events PROC
+    MOV BL, current_pos
+    MOV last_pos, BL
     MOV AH, 00h
     INT 16h
     CMP AH, 75
@@ -182,27 +173,71 @@ update_main_events PROC
     CMP AH, 72
     JE ev_top
     CMP AH, 80
-    JE ev_bottom
+    JE ev_bottom 
+    CMP AH, 28
+    JE ev_enter
+    JMP ev_end
     ev_left:
-        DEC selected_pos
+        DEC current_pos
+        CALL update_table
         JMP ev_end
     ev_right:
-        INC selected_pos
+        INC current_pos 
+        CALL update_table
         JMP ev_end
     ev_top:
-        SUB selected_pos, 5
+        SUB current_pos, 5
+        CALL update_table
         JMP ev_end
     ev_bottom:
-        ADD selected_pos, 5
+        ADD current_pos, 5
+        CALL update_table
         JMP ev_end
+    ev_enter:
+        CALL open_cell 
     ev_end:
     RET
 update_main_events ENDP
 
+update_table PROC
+    MOV AH, 0    
+    MOV AL, last_pos
+    MOV BX, 5
+    DIV BL       
+    MOV CX, AX  
+    
+    MOV AH, 0    
+    MOV AL, current_pos
+    DIV BL 
+    
+    MOV DH, AL
+    MOV DL, AH 
+    mov AH, 02h 
+    INT 10h ; setar posicao na tela
+       
+    MOV AL, 'X'
+    MOV AH, 0Eh 
+    INT  10h ; escrever na tela
+        
+    MOV DH, CL
+    MOV DL, CH     
+    MOV AH, 02h 
+    INT 10h ; setar posicao na tela
+    MOV AL, 'x'
+    MOV AH, 0Eh 
+    INT  10h ; escrever na tela
+    RET
+update_table ENDP
+
+open_cell PROC
+    RET    
+open_cell ENDP
+
 main:
     CALL ask_level
     CALL start_bombs
-main_loop:
+    CALL clear_screen
     CALL show_table
+main_loop:
     CALL update_main_events
     JMP main_loop
