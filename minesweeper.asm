@@ -21,10 +21,18 @@ ORG 100h
                 DB 'xxxxx', 10, 13
                 DB 'xxxxx$'
 
+    MSG_WINNER DB 'PARABENS!$'
+
+    MSG_LOSER DB 'PERDEU!', 10, 13
+              DB 'Infelizmente achamos o mapa quando voce pisou na bomba:$', 10, 13
+
     bombs DB 25 DUP(0)
+    visible_map DB 25 DUP(0)
     qty_bombs DW ?
+    qty_cell_to_open DW 25
     last_pos DB 0
     current_pos DB 0
+    status_game DB 0
 
 .code
 
@@ -119,6 +127,7 @@ ask_level PROC
 
     CALL ask_level_events
     MOV qty_bombs, AX
+    SUB qty_cell_to_open, AX
 
     RET
 ask_level ENDP
@@ -143,6 +152,7 @@ start_bombs PROC
         MOV AL, DL
         CBW
         MOV SI, AX
+        ;todo verificar se nessa posição já existe uma bomba
         MOV [bombs + SI], 1
     LOOP loop_bombs
     RET
@@ -166,6 +176,60 @@ info_events PROC
 
     RET
 info_events ENDP
+
+show_map PROC
+    MOV DH, 2
+    MOV SI, 0
+    l1:
+        MOV DL, 0
+        MOV BH, 0    ;Display page
+        MOV AH, 02h  ;SetCursorPosition
+        INT 10h
+        l2:
+            CMP [bombs + SI], 1
+            JE bomb_char
+                ;Marca celula sem bomba
+                MOV AL, 'o'
+                JMP char_end
+            bomb_char:
+                ;Marca celula com bomba
+                MOV AL, '?'
+            char_end:
+                MOV  AH, 0Eh  ;Teletype
+                INT 10h
+
+                INC SI
+                INC DL
+                CMP DL, 5
+                JL l2
+                INC DH
+                CMP DH, 7
+                JL l1
+
+    RET
+show_map ENDP
+
+show_results PROC
+    CALL clear_screen
+    CMP status_game, 2
+    JE write_winner
+
+    ;Mostra mensagem de derrota e o mapa
+    MOV DX, OFFSET MSG_LOSER
+    MOV AH, 9
+    INT 21h
+    CALL show_map
+    JMP end_show_result
+
+    write_winner:
+        MOV DX, OFFSET MSG_WINNER
+        MOV AH, 9
+        INT 21h
+
+    end_show_result:
+
+    RET
+show_results ENDP
 
 show_info PROC
     CALL clear_screen
@@ -237,6 +301,7 @@ update_main_events PROC
 update_main_events ENDP
 
 update_table PROC
+    ;todo verificar na tabela/vetor visible_map 0 = x | X, 1 = o | O, ou outra letra
     MOV AH, 0
     MOV AL, last_pos
     MOV BX, 5
@@ -267,6 +332,29 @@ update_table PROC
 update_table ENDP
 
 open_cell PROC
+    ;Verifica se posicao ja foi aberta, SI armazenara o valor do deslocamento para o procedimento
+    MOV AH, 0
+    MOV AL, current_pos
+    MOV SI, AX
+    CMP [visible_map + SI], 1
+    JE end_open_cell
+
+    ;verifica se posicao é bomba
+    CMP [bombs + SI], 0
+    JE open_cell_no_bomb
+    ;Escreve perdedor, caso seja bomba
+    MOV status_game, 1
+    JMP end_open_cell
+
+    open_cell_no_bomb:
+        MOV [visible_map + SI], 1
+        DEC qty_cell_to_open
+        CMP qty_cell_to_open, 0
+        JNE end_open_cell
+        ;Escreve vencedor
+        MOV status_game, 2
+
+    end_open_cell:
     RET
 open_cell ENDP
 
@@ -278,4 +366,10 @@ main:
     CALL show_table
 main_loop:
     CALL update_main_events
+    CMP status_game, 0
+    JNE end_game
     JMP main_loop
+end_game:
+    CALL show_results
+    MOV AH, 0
+    INT 21h
