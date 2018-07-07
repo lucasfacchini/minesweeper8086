@@ -153,7 +153,14 @@ start_bombs PROC
         CBW
         MOV SI, AX
         ;todo verificar se nessa posição já existe uma bomba
+        MOV AH, [bombs + SI]
+        CMP AH, 1
+        JNE store_bomb
+        INC AL
+        JMP loop_bombs        
+        store_bomb:        
         MOV [bombs + SI], 1
+        
     LOOP loop_bombs
     RET
 start_bombs ENDP
