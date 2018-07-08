@@ -9,22 +9,27 @@ ORG 100h
                   DB '        Dificil (15 bombas)$'
 
     MSG_INFO DB 'As teclas direcionais cima/baixo/esquerda/direita navegam pelo campo', 10, 13
-             DB 'Precione enter para abrir a posicao selecionada', 10, 13
+             DB 'Precione ENTER para abrir a posicao selecionada', 10, 13
              DB 'Boa sorte soldado!', 10, 13, 10, 13
              DB 'Carregando, aguarde...$'
 
-    MSG_READY DB 'Pronto para jogar, precione enter$'
+    MSG_READY DB 'Pronto para jogar, precione ENTER$'
 
     START_TABLE DB 'Xxxxx', 10, 13
                 DB 'xxxxx', 10, 13
                 DB 'xxxxx', 10, 13
                 DB 'xxxxx', 10, 13
                 DB 'xxxxx$'
-
+                
+    CELL_CLOSED DB 'x'
+    CELL_CLOSED_SELECTED DB 'X'
+    CELL_OPENED DB 'o'
+    CELL_OPENED_SELECTED DB 'O'
+    
     MSG_WINNER DB 'PARABENS!$'
 
     MSG_LOSER DB 'PERDEU!', 10, 13
-              DB 'Infelizmente achamos o mapa quando voce pisou na bomba:$', 10, 13
+              DB 'Infelizmente achamos o mapa quando voce pisou na bomba:$', 10, 13 
 
     bombs DB 25 DUP(0)
     visible_map DB 25 DUP(0)
@@ -152,7 +157,6 @@ start_bombs PROC
         MOV AL, DL
         CBW
         MOV SI, AX
-        ;todo verificar se nessa posição já existe uma bomba
         MOV AH, [bombs + SI]
         CMP AH, 1
         JNE store_bomb
@@ -200,7 +204,7 @@ show_map PROC
                 JMP char_end
             bomb_char:
                 ;Marca celula com bomba
-                MOV AL, '?'
+                MOV AL, '1'
             char_end:
                 MOV  AH, 0Eh  ;Teletype
                 INT 10h
@@ -225,7 +229,6 @@ show_results PROC
     MOV DX, OFFSET MSG_LOSER
     MOV AH, 9
     INT 21h
-    CALL show_map
     JMP end_show_result
 
     write_winner:
@@ -234,7 +237,12 @@ show_results PROC
         INT 21h
 
     end_show_result:
-
+    CALL show_map
+    MOV DL, 0
+    MOV DH, 8
+    MOV BH, 0
+    MOV AH, 02h
+    INT 10h 
     RET
 show_results ENDP
 
@@ -308,7 +316,6 @@ update_main_events PROC
 update_main_events ENDP
 
 update_table PROC
-    ;todo verificar na tabela/vetor visible_map 0 = x | X, 1 = o | O, ou outra letra
     MOV AH, 0
     MOV AL, last_pos
     MOV BX, 5
@@ -316,25 +323,47 @@ update_table PROC
     MOV CX, AX
 
     MOV AH, 0
+    
     MOV AL, current_pos
     DIV BL
-
+    
+    ; atualizar selecionado (current_pos)
     MOV DH, AL
     MOV DL, AH
-    mov AH, 02h
-    INT 10h ; setar posicao na tela
+    MOV AH, 02h
+    INT 10h ; setar posicao na tela             
+    MOV AH, 0             
+    MOV AL, current_pos
+    MOV SI, AX
+    CMP [visible_map + SI], 1
+    JE update_opened
+    MOV AL, CELL_CLOSED_SELECTED
+    JMP write_current                    
+    update_opened:
+        MOV AL, CELL_OPENED_SELECTED    
+    write_current:
+        MOV AH, 0Eh
+        INT 10h ; escrever na tela
 
-    MOV AL, 'X'
-    MOV AH, 0Eh
-    INT  10h ; escrever na tela
-
+    ; atualizar anterior (last_pos)
+    
     MOV DH, CL
     MOV DL, CH
     MOV AH, 02h
     INT 10h ; setar posicao na tela
-    MOV AL, 'x'
-    MOV AH, 0Eh
-    INT  10h ; escrever na tela
+    
+    MOV AH, 0             
+    MOV AL, last_pos
+    MOV SI, AX
+    CMP [visible_map + SI], 1
+    JE update_opened_last
+    MOV AL, CELL_CLOSED
+    JMP write_last                    
+    update_opened_last:
+        MOV AL, CELL_OPENED
+    write_last:
+        MOV AH, 0Eh
+        INT 10h ; escrever na tela
     RET
 update_table ENDP
 
@@ -355,6 +384,19 @@ open_cell PROC
 
     open_cell_no_bomb:
         MOV [visible_map + SI], 1
+        
+        MOV BX, 5
+        DIV BL
+        
+        MOV DH, AL
+        MOV DL, AH
+        MOV AH, 02h
+        INT 10h ; setar posicao na tela
+    
+        MOV AL, 'O'
+        MOV AH, 0Eh
+        INT 10h ; escrever na tela         
+        
         DEC qty_cell_to_open
         CMP qty_cell_to_open, 0
         JNE end_open_cell
@@ -369,7 +411,7 @@ main:
     CALL ask_level
     CALL show_info
     CALL start_bombs
-    CAlL info_events
+    CALL info_events
     CALL show_table
 main_loop:
     CALL update_main_events
