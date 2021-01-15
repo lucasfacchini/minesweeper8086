@@ -2,7 +2,7 @@
 
 Uma implementação do jogo campo minado na linguagem assembly.
 
-Esta é uma entrega de trabalho para a disciplina de Arquitetura de Computadores ([Universidade de Caxias do Sul](https://www.ucs.br/)), desenvolvido por [Lucas Facchini](https://github.com/lucasfacchini) and [Adryan Alessandro Signor](https://github.com/AdryanSignor).
+Esta é uma entrega de trabalho para a disciplina de Arquitetura de Computadores ([Universidade de Caxias do Sul](https://www.ucs.br/)), desenvolvido por [Lucas Facchini](https://github.com/lucasfacchini) e [Adryan Alessandro Signor](https://github.com/AdryanSignor).
 
 # Execução #
 
